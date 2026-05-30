@@ -52,5 +52,16 @@ export const getTasksSchema = z.object({
   assigneeId: z.uuid().optional(),
 });
 
+export const updateTaskStatusSchema = z.object({
+  status: z.enum([
+    TaskStatus.TODO,
+    TaskStatus.IN_PROGRESS,
+    TaskStatus.IN_REVIEW,
+    TaskStatus.BLOCKED,
+    TaskStatus.DONE,
+  ]),
+});
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type GetTasksInput = z.infer<typeof getTasksSchema>;
+export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;

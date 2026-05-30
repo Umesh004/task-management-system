@@ -7,8 +7,16 @@ import { authorize } from "../../middleware/authorize";
 import { asyncHandler } from "../../middleware/asyncHandler";
 import { validate } from "../../middleware/validate";
 
-import { createTaskSchema, getTasksSchema } from "./task.schema";
-import { createTaskController, getTasksController } from "./task.controller";
+import {
+  createTaskSchema,
+  getTasksSchema,
+  updateTaskStatusSchema,
+} from "./task.schema";
+import {
+  createTaskController,
+  getTasksController,
+  updateTaskStatusController,
+} from "./task.controller";
 
 const router = Router();
 
@@ -25,6 +33,13 @@ router.get(
   authenticate,
   validate(getTasksSchema, "query"),
   asyncHandler(getTasksController),
+);
+
+router.patch(
+  "/:taskId/status",
+  authenticate,
+  validate(updateTaskStatusSchema),
+  asyncHandler(updateTaskStatusController),
 );
 
 export default router;

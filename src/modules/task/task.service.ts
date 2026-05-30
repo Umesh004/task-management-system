@@ -3,7 +3,19 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../utils/ApiError";
 
 import { CreateTaskInput, GetTasksInput } from "./task.schema";
-import { Prisma, Role } from "@prisma/client";
+import { Prisma, Role, TaskStatus } from "@prisma/client";
+
+const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
+  TODO: [TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED],
+
+  IN_PROGRESS: [TaskStatus.IN_REVIEW, TaskStatus.BLOCKED],
+
+  IN_REVIEW: [TaskStatus.DONE, TaskStatus.BLOCKED],
+
+  BLOCKED: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW],
+
+  DONE: [],
+};
 
 export const createTask = async (
   payload: CreateTaskInput,
@@ -134,4 +146,67 @@ export const getTasks = async (
       totalPages: Math.ceil(total / parsedLimit),
     },
   };
+};
+
+export const updateTaskStatus = async (
+  taskId: string,
+  status: TaskStatus,
+  user: {
+    userId: string;
+    role: Role;
+    organizationId: string;
+  },
+) => {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      organizationId: user.organizationId,
+    },
+  });
+
+  if (!task) {
+    throw new ApiError(404, "TASK_NOT_FOUND", "Task not found");
+  }
+
+  // Only MANAGER
+  const isManager = user.role === Role.MANAGER;
+
+  // Assignee can update own task
+  const isAssignee = task.assigneeId === user.userId;
+
+  if (!isManager && !isAssignee) {
+    throw new ApiError(403, "FORBIDDEN", "You cannot update this task");
+  }
+
+  const allowed = allowedTransitions[task.status];
+
+  if (!allowed.includes(status)) {
+    throw new ApiError(
+      400,
+      "INVALID_STATUS_TRANSITION",
+      `Cannot move task from ${task.status} to ${status}`,
+    );
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: {
+      id: task.id,
+    },
+
+    data: {
+      status,
+    },
+
+    include: {
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  return updatedTask;
 };
