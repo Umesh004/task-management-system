@@ -2,7 +2,7 @@ import { prisma } from "../../lib/prisma";
 
 import { ApiError } from "../../utils/ApiError";
 
-import { CreateTaskInput, GetTasksInput } from "./task.schema";
+import { CreateTaskInput, GetTasksInput, UpdateTaskInput } from "./task.schema";
 import { Prisma, Role, TaskStatus } from "@prisma/client";
 
 const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -209,4 +209,101 @@ export const updateTaskStatus = async (
   });
 
   return updatedTask;
+};
+
+export const updateTask = async (
+  taskId: string,
+  payload: UpdateTaskInput,
+  organizationId: string,
+) => {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      organizationId,
+    },
+  });
+
+  if (!task) {
+    throw new ApiError(404, "TASK_NOT_FOUND", "Task not found");
+  }
+
+  // Validate assignee if changing
+  if (payload.assigneeId) {
+    const assignee = await prisma.user.findFirst({
+      where: {
+        id: payload.assigneeId,
+        organizationId,
+      },
+    });
+
+    if (!assignee) {
+      throw new ApiError(
+        404,
+        "ASSIGNEE_NOT_FOUND",
+        "Assignee not found in organization",
+      );
+    }
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: {
+      id: task.id,
+    },
+
+    data: {
+      ...(payload.title && {
+        title: payload.title,
+      }),
+
+      ...(payload.description !== undefined && {
+        description: payload.description,
+      }),
+
+      ...(payload.priority && {
+        priority: payload.priority,
+      }),
+
+      ...(payload.assigneeId && {
+        assigneeId: payload.assigneeId,
+      }),
+
+      ...(payload.dueDate && {
+        dueDate: new Date(payload.dueDate),
+      }),
+    },
+
+    include: {
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  return updatedTask;
+};
+
+export const deleteTask = async (taskId: string, organizationId: string) => {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      organizationId,
+    },
+  });
+
+  if (!task) {
+    throw new ApiError(404, "TASK_NOT_FOUND", "Task not found");
+  }
+
+  await prisma.task.delete({
+    where: {
+      id: task.id,
+    },
+  });
+
+  return null;
 };

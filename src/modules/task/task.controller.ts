@@ -1,6 +1,12 @@
 import { Request, Response } from "express";
 
-import { createTask, getTasks, updateTaskStatus } from "./task.service";
+import {
+  createTask,
+  getTasks,
+  updateTaskStatus,
+  updateTask,
+  deleteTask,
+} from "./task.service";
 
 import { sendResponse } from "../../utils/response";
 
@@ -27,4 +33,20 @@ export const updateTaskStatusController = async (
   );
 
   return sendResponse(res, 200, "Task status updated successfully", result);
+};
+
+export const updateTaskController = async (req: Request, res: Response) => {
+  const result = await updateTask(
+    String(req.params.taskId),
+    req.body,
+    req.user!.organizationId,
+  );
+
+  return sendResponse(res, 200, "Task updated successfully", result);
+};
+
+export const deleteTaskController = async (req: Request, res: Response) => {
+  await deleteTask(String(req.params.taskId), req.user!.organizationId);
+
+  return sendResponse(res, 200, "Task deleted successfully", null);
 };

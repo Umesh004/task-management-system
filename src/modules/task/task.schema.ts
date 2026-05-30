@@ -62,6 +62,35 @@ export const updateTaskStatusSchema = z.object({
   ]),
 });
 
+export const updateTaskSchema = z
+  .object({
+    title: z.string().min(3, "title must be at least 3 characters").optional(),
+
+    description: z.string().optional(),
+
+    priority: z
+      .enum([TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH])
+      .optional(),
+
+    assigneeId: z.string().uuid().optional(),
+
+    dueDate: z.string().datetime().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.dueDate) {
+        return true;
+      }
+
+      return new Date(data.dueDate) > new Date();
+    },
+    {
+      message: "due_date must be a future date",
+      path: ["dueDate"],
+    },
+  );
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type GetTasksInput = z.infer<typeof getTasksSchema>;
 export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
