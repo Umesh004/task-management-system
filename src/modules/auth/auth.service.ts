@@ -177,3 +177,25 @@ export const refreshUserToken = async (payload: RefreshTokenInput) => {
     refreshToken: newRefreshToken,
   };
 };
+
+// GET LOGGED USER
+export const getCurrentUser = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "USER_NOT_FOUND", "User not found");
+  }
+
+  return user;
+};

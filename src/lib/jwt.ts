@@ -35,3 +35,10 @@ export const verifyRefreshToken = (token: string) => {
     userId: string;
   };
 };
+
+export const verifyAccessToken = (token: string) => {
+  return jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+    userId: string;
+    role: string;
+  };
+};
