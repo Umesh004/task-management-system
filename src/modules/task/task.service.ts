@@ -5,6 +5,9 @@ import { ApiError } from "../../utils/ApiError";
 import { CreateTaskInput, GetTasksInput, UpdateTaskInput } from "./task.schema";
 import { Prisma, Role, TaskStatus } from "@prisma/client";
 
+import { redisClient } from "../../lib/redis";
+import { invalidateTaskCache } from "../../utils/cache";
+
 const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
   TODO: [TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED],
 
@@ -63,6 +66,7 @@ export const createTask = async (
     },
   });
 
+  await invalidateTaskCache(organizationId);
   return task;
 };
 
@@ -74,6 +78,15 @@ export const getTasks = async (
     organizationId: string;
   },
 ) => {
+  // serve from cache if already exists
+  const cacheKey = `tasks:${user.organizationId}:${user.userId}:${JSON.stringify(query)}`;
+  const cached = await redisClient.get(cacheKey);
+  if (cached) {
+    console.log("Serving from cache");
+    return JSON.parse(cached);
+  }
+
+  // hit DB if cache dont have the data
   // Defensive parsing
   const parsedPage = Number(query.page) || 1;
 
@@ -135,17 +148,22 @@ export const getTasks = async (
     }),
   ]);
 
-  return {
-    tasks,
+  const result = {
+    data: tasks,
 
     pagination: {
       total,
       page: parsedPage,
       limit: parsedLimit,
-
       totalPages: Math.ceil(total / parsedLimit),
     },
   };
+
+  await redisClient.set(cacheKey, JSON.stringify(result), {
+    EX: 300,
+  });
+
+  return result;
 };
 
 export const updateTaskStatus = async (
@@ -207,6 +225,10 @@ export const updateTaskStatus = async (
       },
     },
   });
+
+  if (task.organizationId) {
+    await invalidateTaskCache(task.organizationId);
+  }
 
   return updatedTask;
 };
@@ -284,6 +306,13 @@ export const updateTask = async (
     },
   });
 
+  // Invalidate if any task is updated
+  if (task.organizationId) await invalidateTaskCache(task.organizationId);
+
+  if (payload.assigneeId) {
+    await invalidateTaskCache(payload.assigneeId);
+  }
+
   return updatedTask;
 };
 
@@ -298,6 +327,8 @@ export const deleteTask = async (taskId: string, organizationId: string) => {
   if (!task) {
     throw new ApiError(404, "TASK_NOT_FOUND", "Task not found");
   }
+
+  if (task.organizationId) await invalidateTaskCache(task.organizationId);
 
   await prisma.task.delete({
     where: {
