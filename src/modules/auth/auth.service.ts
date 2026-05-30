@@ -23,42 +23,58 @@ export const registerUser = async (payload: RegisterInput) => {
 
   const hashedPassword = await hashPassword(payload.password);
 
+  const organization = await prisma.organization.create({
+    data: {
+      name: payload.organizationName,
+    },
+  });
+
   const user = await prisma.user.create({
     data: {
       name: payload.name,
       email: payload.email,
       password: hashedPassword,
+
+      role: "ADMIN",
+
+      organizationId: organization.id,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      organizationId: true,
     },
   });
 
-  const accessToken = generateAccessToken(user.id, user.role);
+  const accessToken = generateAccessToken(
+    user.id,
+    user.role,
+    user.organizationId!,
+  );
 
   const refreshToken = generateRefreshToken(user.id);
 
-  const tokenHash = await bcrypt.hash(refreshToken, 10);
+  const tokenHash = await hashPassword(refreshToken);
 
   await prisma.refreshToken.create({
     data: {
-      tokenHash: tokenHash,
+      tokenHash,
       userId: user.id,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
 
   return {
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
+    user,
     tokens: {
       accessToken,
       refreshToken,
     },
   };
 };
-
 // LOGIN HANDLER
 export const loginUser = async (payload: LoginInput) => {
   const user = await prisma.user.findUnique({
@@ -80,7 +96,11 @@ export const loginUser = async (payload: LoginInput) => {
     throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
   }
 
-  const accessToken = generateAccessToken(user.id, user.role);
+  const accessToken = generateAccessToken(
+    user.id,
+    user.role,
+    user.organizationId!,
+  );
 
   const refreshToken = generateRefreshToken(user.id);
 
@@ -158,7 +178,11 @@ export const refreshUserToken = async (payload: RefreshTokenInput) => {
     },
   });
 
-  const newAccessToken = generateAccessToken(user.id, user.role);
+  const newAccessToken = generateAccessToken(
+    user.id,
+    user.role,
+    user.organizationId!,
+  );
 
   const newRefreshToken = generateRefreshToken(user.id);
 

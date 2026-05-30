@@ -22,6 +22,7 @@ export const authenticate = (
     req.user = {
       userId: decoded.userId,
       role: decoded.role as any,
+      organizationId: decoded.organizationId,
     };
 
     next();
