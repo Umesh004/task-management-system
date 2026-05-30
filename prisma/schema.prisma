@@ -93,4 +93,9 @@ model Task {
   @@index([status])
   @@index([assigneeId])
   @@index([dueDate])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, assigneeId])
+
 }
