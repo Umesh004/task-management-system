@@ -10,6 +10,9 @@ import userRoutes from "./modules/user/user.routes";
 import taskRoutes from "./modules/task/task.routes";
 import { errorHandler } from "./middleware/errorHandler";
 
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
+
 const app = express();
 
 app.use(cors());
@@ -17,6 +20,8 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
+
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API ROUTES
 app.use("/api/auth", authRoutes);
